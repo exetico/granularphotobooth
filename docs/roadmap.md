@@ -324,15 +324,11 @@ python run.py
 }
 ```
 
-### Tests
-Three new tests in `tests/test_storage_local.py`:
-- `test_raw_goes_to_raw_dir` — raw frames land in `raw_dir`
-- `test_composite_goes_to_composite_dir` — composites land in `composite_dir`
-- `test_is_configured_with_raw_dir` — `is_configured()` recognises new key
+## Phase 11 — Tests as part of Pull Requests on GitHub
 
----
+Make tests run on GitHub, as part of pull request.
 
-## Phase 11 — DSLR Backend Field Test `[TODO]`
+## Phase 12 — Tests: DSLR Backend Field Test `[TODO]`
 
 **Goal:** Verify the `dslr_gphoto2` camera backend on a real Canon EOS 650D
 connected via USB to a Linux laptop.  All earlier phases were developed and
@@ -352,3 +348,32 @@ tested with the webcam/virtual fallback.
 - Do **not** change the webcam backend or state machine
 - Do **not** add RAW (CR2/CR3) support yet — JPEG-from-camera only
 
+### Tests
+Three new tests in `tests/test_storage_local.py`:
+- `test_raw_goes_to_raw_dir` — raw frames land in `raw_dir`
+- `test_composite_goes_to_composite_dir` — composites land in `composite_dir`
+- `test_is_configured_with_raw_dir` — `is_configured()` recognises new key
+
+## Phase 13 - Admin Settings in UI
+
+### Admin Panel — Minimal & Secure (proof-of-concept)
+
+Security approach: token-only, no sessions
+
+On first start (or when missing), generate a random 32-byte URL-safe token and write it to admin_token.txt (gitignored, chmod 600). The operator copies the token once and uses it.
+Every admin API request must include the token as a Bearer header. Wrong token → 403. No brute-force window because the token is long enough (256 bits).
+Admin endpoints are completely separate from the kiosk UI routes — a kiosk visitor never sees them.
+
+### What the admin panel can do
+
+Restart server — calls broker.request_shutdown() then os.execv to re-exec the current process (zero-downtime kiosk restart).
+View & edit config — GET /admin/config returns current config JSON, POST /admin/config validates against schema then hot-reloads via existing broker.reload_config(). No extra write to disk needed for live reload; optionally persist.
+
+### Implementation scope (minimal)
+
+web/server.py — add _check_admin_token() helper + 3 new routes: GET /admin, GET /admin/config, POST /admin/config, POST /admin/restart.
+web/static/admin.html — simple single-page form (vanilla HTML, no framework): textarea showing current config JSON, Save button, Restart button. Token entered once and stored in sessionStorage.
+run.py — generate token on startup if missing; log its value once to console (operator reads it from terminal).
+admin_token.txt added to .gitignore.
+One new test: tests/test_admin_api.py — test token validation (valid/invalid), config GET, config POST with valid JSON, config POST with invalid JSON.
+Webui on the user end with a password input to change the settings, just a dump 1-9 digit input with 8. min chars as the password, on top of the 32-byte url safe token
