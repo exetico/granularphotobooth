@@ -275,7 +275,7 @@ Exec=chromium-browser --kiosk --app=http://localhost:8080
 
 ---
 
-## Phase 9 — Config Hot-Reload & Operational Polish `[TODO]`
+## Phase 9 — Config Hot-Reload & Operational Polish `[DONE]`
 
 **Goal:** Change `config.json` while the app is running and have the changes take
 effect on the next session — without restarting the process.
@@ -286,20 +286,16 @@ storage target from local disk to S3, or enable the compositor mid-event.
 Restarting the process means briefly losing the kiosk UI.
 
 ### Deliverables
-- `core/config_loader.py` — add `watch()` method using `watchfiles` (or `inotify` on Linux) to
-  detect `config.json` changes and call a registered reload callback
-- `core/broker.py` — handle `SIGHUP` **and** file-watcher events:
-  1. Finish the current in-flight session (don't abort a CAPTURE in progress)
-  2. Re-load config
-  3. Re-load camera / compositor / storage components that differ from the running config
-  4. Broadcast `{"event": "config_reloaded"}` so the UI can notify the operator
-- Add `watchfiles` to `requirements.txt` (pure Python, no native deps)
-
-### Tests
-```bash
-pytest tests/test_config_reload.py -v
-# Simulate a file change, assert reload callback fires with new config
-```
+- `core/config_loader.py` — `watch()` method using `watchfiles` (or mtime polling
+  fallback if not installed) detects `config.json` changes and calls a reload callback.
+- `core/broker.py` — `reload_config(new_config)` and `_apply_config(new_config)`:
+  1. If IDLE: apply immediately, broadcast `{"event": "config_reloaded"}` to clients
+  2. If mid-session: queue in `_pending_config`, apply on return to IDLE
+  3. Re-loads camera / compositor / storage components
+- `run.py` — wires `SIGHUP` → `loader.load()` → `broker.reload_config()` and
+  launches `loader.watch()` as a third asyncio task alongside broker + server.
+- `tests/test_config_reload.py` — 6 tests covering callback, invalid JSON,
+  schema violations, immediate apply, queuing, and deferred apply.
 
 ### Verify
 ```bash

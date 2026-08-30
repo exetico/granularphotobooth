@@ -48,6 +48,14 @@ async def main(config_path: str) -> None:
         logger.info("Received %s — shutting down gracefully…", sig_name)
         broker.request_shutdown()
 
+    def _handle_sighup() -> None:
+        logger.info("Received SIGHUP — reloading config…")
+        try:
+            new_config = loader.load()
+            broker.reload_config(new_config)
+        except (FileNotFoundError, ValueError) as exc:
+            logger.warning("Config reload failed: %s", exc)
+
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:
             loop.add_signal_handler(sig, lambda s=sig.name: _handle_signal(s))
@@ -55,15 +63,25 @@ async def main(config_path: str) -> None:
             # Windows does not support add_signal_handler
             pass
 
+    try:
+        loop.add_signal_handler(signal.SIGHUP, _handle_sighup)
+    except (NotImplementedError, AttributeError):
+        # SIGHUP not available on Windows
+        pass
+
     logger.info(
         "Starting GranularPhotoBooth on http://%s:%s",
         config["app"]["host"],
         config["app"]["port"],
     )
 
+    async def _watch_config() -> None:
+        await loader.watch(lambda new_cfg: broker.reload_config(new_cfg))
+
     await asyncio.gather(
         broker.run(),
         server.run(),
+        _watch_config(),
     )
 
 

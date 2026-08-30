@@ -78,17 +78,62 @@ class Broker:
         if self._state is State.PREVIEW:
             await self._transition(State.IDLE)
 
+    def reload_config(self, new_config: dict[str, Any]) -> None:
+        """Apply a hot-reloaded config.
+
+        Safe to call from any thread (e.g. SIGHUP handler or file-watcher).
+        Component changes (camera, compositor, storage) take effect on the
+        *next* session — never mid-capture.  ``app.host`` / ``app.port`` are
+        ignored because they require a server restart.
+        """
+        # Reload only takes effect when IDLE to avoid disrupting a session
+        if self._state is not State.IDLE:
+            logger.info("Config reload queued — will apply after current session ends")
+            self._pending_config = new_config
+            return
+
+        self._apply_config(new_config)
+        # If an event loop is running, broadcast the notification asynchronously
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_soon_threadsafe(
+                lambda: asyncio.ensure_future(
+                    self._broadcast({"event": "config_reloaded", "data": {}})
+                )
+            )
+        except RuntimeError:
+            pass  # No event loop — called from sync context (e.g. tests)
+
+    def _apply_config(self, new_config: dict[str, Any]) -> None:
+        """Synchronously swap components to match *new_config*.
+
+        The ``config_reloaded`` WebSocket broadcast is done separately
+        (from the async run loop) so this method stays thread-safe.
+        """
+        logger.info("Applying hot-reloaded configuration")
+        self._config = new_config
+        # Re-load all swappable components
+        self._load_camera()
+        self._load_compositor()
+        self._load_storage()
+
     # ------------------------------------------------------------------
     # Main run loop
     # ------------------------------------------------------------------
 
     async def run(self) -> None:
         """Bootstrap components and run the state machine until shutdown."""
+        self._pending_config: dict | None = None
         await self._load_components()
 
         try:
             while not self._shutdown_event.is_set():
                 await self._run_idle()
+                # Apply any pending config reload now that we're back in IDLE
+                if self._pending_config is not None:
+                    self._apply_config(self._pending_config)
+                    self._pending_config = None
+                    await self._broadcast({"event": "config_reloaded", "data": {}})
                 if self._shutdown_event.is_set():
                     break
                 await self._run_sequence()

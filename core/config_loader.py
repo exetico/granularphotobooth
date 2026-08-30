@@ -1,9 +1,10 @@
-"""Configuration loader with JSON Schema validation."""
+"""Configuration loader with JSON Schema validation and hot-reload support."""
 
+import asyncio
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, Callable
 
 import jsonschema
 
@@ -101,3 +102,45 @@ class ConfigLoader:
 
         logger.debug("Configuration validated successfully")
         return config
+
+    async def watch(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Watch the config file for changes and call *callback* with the new config.
+
+        Uses ``watchfiles`` for efficient inotify/kqueue/FSEvents watching.
+        Falls back to polling every 2 s if ``watchfiles`` is not installed.
+
+        The callback is called from the asyncio event loop.  Only changes that
+        produce a valid config trigger a callback — invalid JSON or schema
+        violations are logged and ignored.
+
+        This coroutine runs until cancelled (e.g. on application shutdown).
+        """
+        try:
+            from watchfiles import awatch
+
+            logger.info("Config watcher started (watchfiles) for %s", self._path)
+            async for _ in awatch(self._path):
+                self._on_file_change(callback)
+        except ImportError:
+            logger.warning(
+                "watchfiles not installed — falling back to 2 s polling for config changes"
+            )
+            mtime = os.path.getmtime(self._path) if os.path.isfile(self._path) else 0
+            while True:
+                await asyncio.sleep(2)
+                try:
+                    new_mtime = os.path.getmtime(self._path)
+                except OSError:
+                    continue
+                if new_mtime != mtime:
+                    mtime = new_mtime
+                    self._on_file_change(callback)
+
+    def _on_file_change(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Attempt to reload the config and invoke *callback* if valid."""
+        try:
+            new_config = self.load()
+            logger.info("Config reloaded from %s", self._path)
+            callback(new_config)
+        except (FileNotFoundError, ValueError) as exc:
+            logger.warning("Config reload skipped (invalid file): %s", exc)
