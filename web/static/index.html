@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GranularPhotoBooth</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- Live preview / state overlay -->
+  <div id="app">
+
+    <!-- Live camera preview (MJPEG stream) -->
+    <div id="preview-container">
+      <img id="live-preview" src="/preview" alt="Live preview" />
+      <div id="countdown-overlay" class="hidden">
+        <span id="countdown-number"></span>
+      </div>
+    </div>
+
+    <!-- Captured frames shown during PREVIEW state (one card per shot) -->
+    <div id="captured-container" class="hidden">
+      <div id="frames-strip"></div>
+    </div>
+
+    <!-- Status bar -->
+    <div id="status-bar">
+      <span id="state-label">IDLE</span>
+      <span id="shot-counter" class="hidden"></span>
+    </div>
+
+    <!-- Action buttons -->
+    <div id="controls">
+      <button id="btn-trigger" class="btn btn-primary" onclick="sendEvent('trigger')">
+        📷 Take Photo
+      </button>
+      <button id="btn-confirm" class="btn btn-success hidden" onclick="sendEvent('confirm')">
+        ✔ Keep
+      </button>
+      <button id="btn-retake" class="btn btn-warning hidden" onclick="sendEvent('retake')">
+        ↩ Retake
+      </button>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container"></div>
+  </div>
+
+  <!-- RUNTIME_CONFIG -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
