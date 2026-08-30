@@ -1,0 +1,178 @@
+/* ============================================================
+   GranularPhotoBooth — Touch-first kiosk stylesheet
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg:       #0d0d0d;
+  --surface:  #1a1a1a;
+  --border:   #333;
+  --text:     #f0f0f0;
+  --muted:    #888;
+  --primary:  #4f8ef7;
+  --success:  #3dba7c;
+  --warning:  #f0a030;
+  --danger:   #e0474c;
+  --radius:   12px;
+  --gap:      16px;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---- Layout ---- */
+
+#app {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  height: 100vh;
+  gap: var(--gap);
+  padding: var(--gap);
+}
+
+/* ---- Preview / captured area ---- */
+
+#preview-container,
+#captured-container {
+  position: relative;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#live-preview,
+#captured-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ---- Countdown overlay ---- */
+
+#countdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+#countdown-number {
+  font-size: clamp(80px, 20vw, 200px);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 40px var(--primary);
+  animation: pop 0.4s ease-out;
+}
+
+@keyframes pop {
+  from { transform: scale(1.4); opacity: 0.4; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+/* ---- Status bar ---- */
+
+#status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+#state-label {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+#shot-counter {
+  font-size: 13px;
+  color: var(--primary);
+}
+
+/* ---- Controls ---- */
+
+#controls {
+  display: flex;
+  justify-content: center;
+  gap: var(--gap);
+  padding-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: none;
+  border-radius: var(--radius);
+  padding: 18px 40px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 180px;
+  touch-action: manipulation;
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+.btn:active {
+  transform: scale(0.96);
+}
+
+.btn-primary { background: var(--primary);  color: #fff; }
+.btn-success { background: var(--success);  color: #fff; }
+.btn-warning { background: var(--warning);  color: #000; }
+
+/* ---- Toast ---- */
+
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+}
+
+.toast {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  font-size: 14px;
+  color: var(--text);
+  animation: slideUp 0.3s ease-out;
+  max-width: 400px;
+  text-align: center;
+}
+
+.toast.error { border-color: var(--danger); color: var(--danger); }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Utility ---- */
+
+.hidden { display: none !important; }

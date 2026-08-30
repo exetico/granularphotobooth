@@ -1,0 +1,70 @@
+{
+  "app": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "debug": true,
+    "kiosk_mode": false
+  },
+  "camera": {
+    "backend": "webcam",
+    "backends": {
+      "webcam": {
+        "device_index": 0,
+        "resolution": [1280, 720],
+        "preview_resolution": [640, 360]
+      },
+      "dslr_gphoto2": {
+        "model_hint": "Canon EOS 650D",
+        "iso": "400",
+        "aperture": "5.6",
+        "shutter_speed": "1/125"
+      },
+      "ip_cam": {
+        "stream_url": "http://192.168.1.x:8080/video"
+      }
+    }
+  },
+  "input": {
+    "triggers": ["keyboard", "websocket_button"],
+    "keyboard": {
+      "trigger_key": "space"
+    }
+  },
+  "sequence": {
+    "shots": 4,
+    "countdown_seconds": 3,
+    "preview_duration_seconds": 8,
+    "delay_between_shots_seconds": 2
+  },
+  "compositor": {
+    "enabled": true,
+    "template_image": "assets/layouts/4shot_strip.png",
+    "template_map": "assets/layouts/4shot_strip.json",
+    "output_format": "JPEG",
+    "output_quality": 90
+  },
+  "storage": {
+    "targets": ["local_disk"],
+    "local_disk": {
+      "enabled": true,
+      "output_dir": "output/",
+      "filename_format": "photo_{timestamp}_{uuid}.jpg"
+    },
+    "s3_minio": {
+      "enabled": false,
+      "endpoint_url": "https://s3.amazonaws.com",
+      "bucket": "photobooth-photos",
+      "access_key": "",
+      "secret_key": "",
+      "prefix": "events/2026/"
+    },
+    "ftp_nas": {
+      "enabled": false,
+      "host": "192.168.1.100",
+      "port": 21,
+      "username": "",
+      "password": "",
+      "remote_dir": "/photos/"
+    }
+  }
+}
