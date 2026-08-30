@@ -82,7 +82,9 @@
     }
   }
 
-  // ─── State handlers ────────────────────────────────────────────────  function applyState(state, data) {
+  // ─── State handlers ────────────────────────────────────────────────
+
+  function applyState(state, data) {
     stateLabel.textContent = state;
     console.info("[state]", state, data);
     switch (state) {
@@ -186,7 +188,7 @@
   document.addEventListener("keydown", (ev) => {
     if (ev.code === "Space" && !ev.repeat) {
       ev.preventDefault();
-      sendEvent("trigger");
+      window.sendEvent("trigger");
     }
   });
 

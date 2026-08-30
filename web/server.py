@@ -94,7 +94,7 @@ class WebServer:
         await response.prepare(request)
 
         try:
-            while not request.transport.is_closing():
+            while not response.task.done():
                 frame = await self._broker.get_preview_frame()
                 if frame is None:
                     await asyncio.sleep(0.1)

@@ -44,10 +44,10 @@ class CameraBackend(_Base):
         logger.info("Webcam opened: device=%r, resolution=%s", device, resolution)
 
     def capture(self) -> bytes:
-        import cv2
-
         if self._cap is None or not self._cap.isOpened():
             raise RuntimeError("Webcam is not initialised")
+
+        import cv2
 
         ret, frame = self._cap.read()
         if not ret or frame is None:
@@ -60,10 +60,10 @@ class CameraBackend(_Base):
         return bytes(buf)
 
     def get_preview_frame(self) -> bytes:
-        import cv2
-
         if self._cap is None or not self._cap.isOpened():
             raise RuntimeError("Webcam is not initialised")
+
+        import cv2
 
         ret, frame = self._cap.read()
         if not ret or frame is None:
