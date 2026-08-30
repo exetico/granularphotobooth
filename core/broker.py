@@ -42,6 +42,9 @@ class Broker:
         # Captured frames for the current session
         self._frames: list[bytes] = []
 
+        # Pending config to apply on next return to IDLE (set by reload_config)
+        self._pending_config: dict | None = None
+
     # ------------------------------------------------------------------
     # Public API used by WebServer and Input triggers
     # ------------------------------------------------------------------
@@ -112,6 +115,13 @@ class Broker:
         """
         logger.info("Applying hot-reloaded configuration")
         self._config = new_config
+        # Release the old camera before loading a new one to avoid device leaks
+        if self._camera is not None:
+            try:
+                self._camera.release()
+            except Exception:
+                pass
+            self._camera = None
         # Re-load all swappable components
         self._load_camera()
         self._load_compositor()
@@ -123,7 +133,6 @@ class Broker:
 
     async def run(self) -> None:
         """Bootstrap components and run the state machine until shutdown."""
-        self._pending_config: dict | None = None
         await self._load_components()
 
         try:
