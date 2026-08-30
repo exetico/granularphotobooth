@@ -12,7 +12,7 @@
   const livePreview       = document.getElementById("live-preview");
   const capturedContainer = document.getElementById("captured-container");
   const previewContainer  = document.getElementById("preview-container");
-  const capturedImage     = document.getElementById("captured-image");
+  const framesStrip       = document.getElementById("frames-strip");
   const countdownOverlay  = document.getElementById("countdown-overlay");
   let   countdownNumber   = document.getElementById("countdown-number");
   const stateLabel        = document.getElementById("state-label");
@@ -124,9 +124,23 @@
 
   function enterPreview(data) {
     countdownOverlay.classList.add("hidden");
-    if (data.image_data && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/.test(data.image_data)) {
-      capturedImage.src = data.image_data;
-    }
+    framesStrip.innerHTML = "";
+    const frames = Array.isArray(data.frames) ? data.frames : [];
+    const B64_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+=*$/;
+    frames.forEach((src, i) => {
+      if (!B64_RE.test(src)) return;
+      const card = document.createElement("div");
+      card.className = "frame-card";
+      const label = document.createElement("span");
+      label.className = "frame-label";
+      label.textContent = `Shot ${i + 1}`;
+      const img = document.createElement("img");
+      img.src = src;
+      img.alt = `Shot ${i + 1}`;
+      card.appendChild(label);
+      card.appendChild(img);
+      framesStrip.appendChild(card);
+    });
     capturedContainer.classList.remove("hidden");
     previewContainer.classList.add("hidden");
     setButtons({ trigger: false, confirm: true, retake: true });
@@ -164,7 +178,11 @@
       console.warn("[ui] rejected untrusted image filename:", filename);
       return;
     }
-    capturedImage.src = "/output/" + filename + "?t=" + Date.now();
+    framesStrip.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = "/output/" + filename + "?t=" + Date.now();
+    img.alt = "Captured photo";
+    framesStrip.appendChild(img);
     capturedContainer.classList.remove("hidden");
     previewContainer.classList.add("hidden");
   }

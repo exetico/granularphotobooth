@@ -3,9 +3,15 @@
 > Phases are ordered so you can run and test the app at every milestone.  
 > **Never touch DSLR hardware until Phase 7** — everything before that works with a laptop webcam.
 
+### Status legend
+- `[DONE]` — Implemented, tests pass, verified on a real device
+- `[DONE – NEEDS FIELD TEST]` — Implemented and unit-tested, but requires real hardware/service to fully verify
+- `[IN PROGRESS]` — Currently being worked on
+- `[TODO]` — Not yet started
+
 ---
 
-## Phase 0 — Skeleton & Tooling ✅
+## Phase 0 — Skeleton & Tooling `[DONE]`
 
 **Goal:** `python run.py` prints the loaded config and exits cleanly.
 
@@ -24,7 +30,7 @@ python run.py --config config.json
 
 ---
 
-## Phase 1 — State Machine Core ✅
+## Phase 1 — State Machine Core `[DONE]`
 
 **Goal:** State machine cycles through all states internally, broadcasting events.
 
@@ -44,7 +50,7 @@ client (e.g. `wscat -c ws://localhost:8080/ws`) and watch state_change events.
 
 ---
 
-## Phase 2 — WebSocket Server + Minimal UI ✅
+## Phase 2 — WebSocket Server + Minimal UI `[DONE]`
 
 **Goal:** Open browser, click Take Photo, watch state labels cycle.
 
@@ -63,7 +69,7 @@ python run.py
 
 ---
 
-## Phase 3 — Webcam Backend ✅  ← First Camera Milestone
+## Phase 3 — Webcam Backend `[DONE]` ← First Camera Milestone
 
 **Goal:** Countdown + live preview + captured image displayed in browser.
 
@@ -91,7 +97,7 @@ Set `device_index` to a `.mp4` file path — OpenCV treats video files as captur
 
 ---
 
-## Phase 4 — Keyboard Input ✅
+## Phase 4 — Keyboard Input `[DONE – NEEDS FIELD TEST]`
 
 **Goal:** Press Spacebar on the host → capture sequence starts.
 
@@ -113,7 +119,7 @@ pytest tests/test_input_keyboard.py -v
 
 ---
 
-## Phase 5 — Compositor ✅
+## Phase 5 — Compositor `[DONE]`
 
 **Goal:** 4-shot session produces a composited strip image.
 
@@ -141,7 +147,7 @@ After a 4-shot session the output image dimensions match `canvas_size` from the 
 
 ---
 
-## Phase 6 — Storage Pipeline ✅
+## Phase 6 — Storage Pipeline `[DONE]`
 
 **Goal:** Images saved locally (and optionally to S3 / FTP) without freezing the UI.
 
@@ -178,7 +184,7 @@ MINIO_ENDPOINT=http://localhost:9000 pytest tests/test_storage_s3.py -v
 
 ---
 
-## Phase 7 — DSLR Backend ✅  ← Linux / macOS Only
+## Phase 7 — DSLR Backend `[DONE – NEEDS FIELD TEST]` ← Linux / macOS Only
 
 **Goal:** Canon/Nikon DSLR connected via USB shoots full-res images.
 
@@ -217,7 +223,7 @@ backend and logs a warning — the app still works.
 
 ---
 
-## Phase 8 — Hardening & Kiosk Mode ✅
+## Phase 8 — Hardening & Kiosk Mode `[DONE]`
 
 **Goal:** Production-ready deployment on an event laptop.
 
@@ -263,3 +269,47 @@ Exec=chromium-browser --kiosk --app=http://localhost:8080
 | 2026-08-30 | `request.transport` is `None` in MJPEG preview handler before stream established | Use `response.task.done()` instead |
 | 2026-08-30 | `sendEvent` inside IIFE keydown handler resolved as undefined | Changed to `window.sendEvent` |
 | 2026-08-30 | `cv2` lazy import in `capture()`/`get_preview_frame()` raised `ModuleNotFoundError` before "not initialised" guard | Moved `import cv2` after the guard |
+| 2026-08-30 | Compositor stretched photos into slot shape instead of crop-filling | Switched from `resize` to `ImageOps.fit` (aspect-preserving crop-to-fill) |
+| 2026-08-30 | Preview state only showed last frame of a multi-shot series | Broker now sends all frames as base64 array; UI renders a scrollable strip |
+| 2026-08-30 | Individual raw frames were not saved — only the composite was | Storage pipeline now saves each raw frame with `_shot_N` suffix before saving the composite |
+
+---
+
+## Phase 9 — Config Hot-Reload & Operational Polish `[TODO]`
+
+**Goal:** Change `config.json` while the app is running and have the changes take
+effect on the next session — without restarting the process.
+
+### Why this matters
+On a live event the operator may want to change the countdown duration, swap the
+storage target from local disk to S3, or enable the compositor mid-event.
+Restarting the process means briefly losing the kiosk UI.
+
+### Deliverables
+- `core/config_loader.py` — add `watch()` method using `watchfiles` (or `inotify` on Linux) to
+  detect `config.json` changes and call a registered reload callback
+- `core/broker.py` — handle `SIGHUP` **and** file-watcher events:
+  1. Finish the current in-flight session (don't abort a CAPTURE in progress)
+  2. Re-load config
+  3. Re-load camera / compositor / storage components that differ from the running config
+  4. Broadcast `{"event": "config_reloaded"}` so the UI can notify the operator
+- Add `watchfiles` to `requirements.txt` (pure Python, no native deps)
+
+### Tests
+```bash
+pytest tests/test_config_reload.py -v
+# Simulate a file change, assert reload callback fires with new config
+```
+
+### Verify
+```bash
+python run.py
+# In another terminal:
+# Edit config.json (e.g. change countdown_seconds from 3 to 5)
+# Send SIGHUP:  kill -HUP <pid>
+# Next session uses the new countdown without restarting
+```
+
+### Non-goals
+- Do **not** apply config changes mid-session (between trigger and IDLE return)
+- Do **not** reload `app.host` / `app.port` — those require a server restart

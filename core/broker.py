@@ -144,11 +144,13 @@ class Broker:
                     await asyncio.sleep(between_delay)
 
             # ---- PREVIEW ----
-            preview_frame = self._frames[-1]
-            preview_b64 = base64.b64encode(preview_frame).decode()
+            all_frames_b64 = [
+                f"data:image/jpeg;base64,{base64.b64encode(f).decode()}"
+                for f in self._frames
+            ]
             await self._transition(
                 State.PREVIEW,
-                {"image_data": f"data:image/jpeg;base64,{preview_b64}"},
+                {"frames": all_frames_b64},
             )
 
             self._trigger_event.clear()
@@ -206,22 +208,42 @@ class Broker:
 
         # Storage pipeline
         if self._storage_pipeline is not None:
-            metadata = {"shots": len(self._frames)}
+            all_paths: list[str] = []
+
+            # Save each individual raw frame first
+            for idx, raw_frame in enumerate(self._frames, start=1):
+                meta = {"shots": len(self._frames), "frame": idx, "type": "raw"}
+                try:
+                    paths = await loop.run_in_executor(
+                        None,
+                        self._storage_pipeline.store,
+                        raw_frame,
+                        meta,
+                    )
+                    all_paths.extend(paths)
+                except Exception as exc:
+                    logger.exception("Storage error for raw frame %d: %s", idx, exc)
+
+            # Save the final composite (or single processed image)
+            composite_meta = {"shots": len(self._frames), "type": "composite"}
             try:
                 paths = await loop.run_in_executor(
                     None,
                     self._storage_pipeline.store,
                     final_image,
-                    metadata,
+                    composite_meta,
                 )
-                await self._broadcast(
-                    {"event": "storage_complete", "data": {"paths": paths}}
-                )
+                all_paths.extend(paths)
             except Exception as exc:
-                logger.exception("Storage pipeline error: %s", exc)
+                logger.exception("Storage pipeline error for composite: %s", exc)
                 await self._broadcast(
                     {"event": "error", "data": {"message": f"Storage error: {exc}"}}
                 )
+                return
+
+            await self._broadcast(
+                {"event": "storage_complete", "data": {"paths": all_paths}}
+            )
 
     # ------------------------------------------------------------------
     # Broadcasting helpers

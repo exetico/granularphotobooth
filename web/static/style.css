@@ -55,12 +55,56 @@ html, body {
   justify-content: center;
 }
 
-#live-preview,
-#captured-image {
+#live-preview {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   display: block;
+}
+
+/* ---- Frames strip (PREVIEW state) ---- */
+
+#captured-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+}
+
+#frames-strip {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: min-content;
+}
+
+.frame-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.frame-card img {
+  max-height: 340px;
+  max-width: 260px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  display: block;
+}
+
+.frame-label {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 /* ---- Countdown overlay ---- */

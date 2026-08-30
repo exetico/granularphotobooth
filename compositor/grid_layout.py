@@ -27,7 +27,7 @@ class Compositor(BaseCompositor):
     """Paste captured frames onto a background template using a slot map."""
 
     def compose(self, frames: list[bytes], config: dict) -> bytes:
-        from PIL import Image
+        from PIL import Image, ImageOps
 
         if not frames:
             raise ValueError("compose() called with empty frames list")
@@ -65,9 +65,10 @@ class Compositor(BaseCompositor):
             slot_h: int = slot["height"]
 
             raw_frame = Image.open(io.BytesIO(frames[i])).convert("RGBA")
-            scaled = raw_frame.resize((slot_w, slot_h), Image.LANCZOS)
+            # crop-to-fill: preserve aspect ratio, no stretching
+            fitted = ImageOps.fit(raw_frame, (slot_w, slot_h), method=Image.LANCZOS)
 
-            canvas.paste(scaled, (slot["x"], slot["y"]))
+            canvas.paste(fitted, (slot["x"], slot["y"]))
             logger.debug("Pasted frame %d into slot %d at (%d, %d)", i + 1, slot.get("id", i + 1), slot["x"], slot["y"])
 
         # Encode result
