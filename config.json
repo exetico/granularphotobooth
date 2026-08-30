@@ -5,6 +5,9 @@
     "debug": true,
     "kiosk_mode": false
   },
+  "ui": {
+    "countdown_blur": false
+  },
   "camera": {
     "backend": "webcam",
     "backends": {
@@ -47,7 +50,8 @@
     "targets": ["local_disk"],
     "local_disk": {
       "enabled": true,
-      "output_dir": "output/",
+      "raw_dir": "output/raw/",
+      "composite_dir": "output/composites/",
       "filename_format": "photo_{timestamp}_{uuid}.jpg"
     },
     "s3_minio": {

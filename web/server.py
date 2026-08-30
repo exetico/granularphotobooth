@@ -37,15 +37,30 @@ class WebServer:
         self._app.router.add_get("/ws", self._websocket_handler)
         self._app.router.add_get("/preview", self._preview_handler)
         self._app.router.add_static("/static", _STATIC_DIR)
-        output_dir = self._config["storage"]["local_disk"].get("output_dir", "output/")
-        abs_output = os.path.abspath(output_dir)
-        os.makedirs(abs_output, exist_ok=True)
-        self._app.router.add_static("/output", abs_output)
+        disk_cfg = self._config["storage"].get("local_disk", {})
+        # Support both new split-dir config and old single output_dir
+        raw_dir = disk_cfg.get("raw_dir", disk_cfg.get("output_dir", "output/raw/"))
+        composite_dir = disk_cfg.get("composite_dir", disk_cfg.get("output_dir", "output/composites/"))
+        for d in (raw_dir, composite_dir):
+            os.makedirs(os.path.abspath(d), exist_ok=True)
+        # Serve /output/raw and /output/composites (and the parent for compat)
+        parent = os.path.abspath(os.path.commonpath([raw_dir, composite_dir]))
+        os.makedirs(parent, exist_ok=True)
+        self._app.router.add_static("/output", parent)
 
     async def _index(self, request: web.Request) -> web.Response:
         index_path = os.path.join(_STATIC_DIR, "index.html")
         with open(index_path, encoding="utf-8") as fh:
             html = fh.read()
+        # Inject runtime config as a JSON object so the frontend can read it
+        # without a separate API call.
+        ui_cfg = {
+            "countdown_blur": self._config.get("ui", {}).get("countdown_blur", False),
+        }
+        html = html.replace(
+            "<!-- RUNTIME_CONFIG -->",
+            f'<script>window.__cfg = {json.dumps(ui_cfg)};</script>',
+        )
         return web.Response(text=html, content_type="text/html")
 
     async def _websocket_handler(self, request: web.Request) -> web.WebSocketResponse:

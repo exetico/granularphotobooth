@@ -76,6 +76,13 @@ Webcam tests skip automatically in headless CI when no camera device is found.
 
 ---
 
+## Kiosk Deployment
+
+For production event use — systemd service, Chromium autostart, hiding the
+mouse cursor, SIGHUP hot-reload, and more — see **[`docs/kiosk.md`](docs/kiosk.md)**.
+
+---
+
 ## Adding a Component
 
 1. Create `cameras/my_cam.py` with a class named `CameraBackend` that extends

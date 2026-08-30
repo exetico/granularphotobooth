@@ -74,3 +74,36 @@ def test_upload_multiple_writes_unique_files(tmp_path):
     })
     paths = [target.upload(_make_jpeg_bytes(), {}) for _ in range(3)]
     assert len(set(paths)) == 3
+
+
+# ── split raw_dir / composite_dir ─────────────────────────────────────
+
+def test_raw_goes_to_raw_dir(tmp_path):
+    raw_dir = str(tmp_path / "raw")
+    composite_dir = str(tmp_path / "composites")
+    target = StorageTarget({
+        "raw_dir": raw_dir,
+        "composite_dir": composite_dir,
+        "filename_format": "photo_{timestamp}_{uuid}.jpg",
+    })
+    path = target.upload(_make_jpeg_bytes(), {"type": "raw"})
+    assert path.startswith(raw_dir)
+    assert os.path.isfile(path)
+
+
+def test_composite_goes_to_composite_dir(tmp_path):
+    raw_dir = str(tmp_path / "raw")
+    composite_dir = str(tmp_path / "composites")
+    target = StorageTarget({
+        "raw_dir": raw_dir,
+        "composite_dir": composite_dir,
+        "filename_format": "photo_{timestamp}_{uuid}.jpg",
+    })
+    path = target.upload(_make_jpeg_bytes(), {"type": "composite"})
+    assert path.startswith(composite_dir)
+    assert os.path.isfile(path)
+
+
+def test_is_configured_with_raw_dir():
+    target = StorageTarget({"raw_dir": "/tmp/raw/", "filename_format": "photo_{timestamp}_{uuid}.jpg"})
+    assert target.is_configured() is True

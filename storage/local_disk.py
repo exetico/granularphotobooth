@@ -1,12 +1,18 @@
 """Local disk storage target.
 
-Saves the final image to a local directory with a configurable filename
-pattern.  The output directory is created automatically if it does not
-exist.
+Saves images to separate directories depending on whether they are raw
+individual shots or the final composite.  Both directories are created
+automatically if they do not exist.
 
-Filename placeholders:
-  {timestamp}  — ISO-8601 UTC timestamp (``20260830T120000``)
-  {uuid}       — Random UUID (first 8 characters)
+Configuration keys:
+  raw_dir          — directory for individual raw frames (default: ``output/raw/``)
+  composite_dir    — directory for composite/collage images (default: ``output/composites/``)
+  filename_format  — filename pattern with ``{timestamp}`` and ``{uuid}`` placeholders
+
+The ``metadata`` dict passed by the pipeline contains a ``type`` key:
+  ``"raw"``       → image is written to ``raw_dir``
+  ``"composite"`` → image is written to ``composite_dir``
+  (anything else) → falls back to ``raw_dir``
 """
 
 import logging
@@ -23,11 +29,29 @@ class StorageTarget(_Base):
     """Write the captured image to the local filesystem."""
 
     def is_configured(self) -> bool:
-        return bool(self._config.get("output_dir"))
+        # Accept both old single-dir config and new split-dir config
+        return bool(
+            self._config.get("raw_dir")
+            or self._config.get("composite_dir")
+            or self._config.get("output_dir")  # backwards compat
+        )
 
     def upload(self, image_bytes: bytes, metadata: dict) -> str:
-        output_dir: str = self._config.get("output_dir", "output/")
-        filename_fmt: str = self._config.get("filename_format", "photo_{timestamp}_{uuid}.jpg")
+        image_type: str = metadata.get("type", "raw")
+        filename_fmt: str = self._config.get(
+            "filename_format", "photo_{timestamp}_{uuid}.jpg"
+        )
+
+        if image_type == "composite":
+            output_dir = self._config.get(
+                "composite_dir",
+                self._config.get("output_dir", "output/composites/"),
+            )
+        else:
+            output_dir = self._config.get(
+                "raw_dir",
+                self._config.get("output_dir", "output/raw/"),
+            )
 
         os.makedirs(output_dir, exist_ok=True)
 
@@ -39,5 +63,5 @@ class StorageTarget(_Base):
         with open(path, "wb") as fh:
             fh.write(image_bytes)
 
-        logger.info("Saved locally: %s (%d bytes)", path, len(image_bytes))
+        logger.info("Saved locally (%s): %s (%d bytes)", image_type, path, len(image_bytes))
         return path

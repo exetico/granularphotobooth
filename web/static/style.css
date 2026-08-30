@@ -62,23 +62,24 @@ html, body {
   display: block;
 }
 
-/* ---- Frames strip (PREVIEW state) ---- */
+/* ---- Frames grid (PREVIEW state) ---- */
 
 #captured-container {
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: auto;
   background: var(--surface);
   border-radius: var(--radius);
   padding: 12px;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 #frames-strip {
-  display: flex;
+  display: grid;
+  /* auto-fill columns that are at least 220px wide; expands to fill space */
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
-  align-items: flex-start;
-  min-width: min-content;
+  width: 100%;
 }
 
 .frame-card {
@@ -86,15 +87,12 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
 }
 
 .frame-card img {
-  max-height: 340px;
-  max-width: 260px;
-  width: auto;
-  height: auto;
-  object-fit: contain;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
   border-radius: 8px;
   border: 2px solid var(--border);
   display: block;
@@ -116,7 +114,8 @@ html, body {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  /* backdrop-filter is enabled at runtime via JS when kiosk_countdown_blur is true */
+  backdrop-filter: var(--countdown-blur, none);
 }
 
 #countdown-number {

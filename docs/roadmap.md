@@ -232,32 +232,8 @@ backend and logs a warning — the app still works.
 - Graceful shutdown: `SIGTERM`/`SIGINT` releases camera and closes WebSocket connections
 - `is_shutdown_requested()` public method on `Broker` (no internal attribute leakage)
 
-### Kiosk Mode (Linux — Chromium)
-```json
-"app": { "kiosk_mode": true }
-```
-
-Systemd unit example (`/etc/systemd/system/photobooth.service`):
-```ini
-[Unit]
-Description=GranularPhotoBooth
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/granularphotobooth
-ExecStart=/opt/granularphotobooth/.venv/bin/python run.py
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Chromium autostart (put in `~/.config/autostart/photobooth-browser.desktop`):
-```ini
-[Desktop Entry]
-Type=Application
-Exec=chromium-browser --kiosk --app=http://localhost:8080
-```
+> **Kiosk deployment instructions** (systemd, Chromium autostart, Raspberry Pi, etc.)
+> have been moved to [`docs/kiosk.md`](kiosk.md).
 
 ---
 
@@ -309,3 +285,70 @@ python run.py
 ### Non-goals
 - Do **not** apply config changes mid-session (between trigger and IDLE return)
 - Do **not** reload `app.host` / `app.port` — those require a server restart
+
+---
+
+## Phase 10 — UI Polish & Preview Grid `[DONE]`
+
+**Goal:** Make the preview and kiosk experience look great on a real event screen.
+
+### Deliverables
+- **Preview grid** — replaces the horizontal scroll strip with a CSS `auto-fill`
+  grid so 4 shots display in a 2×2 layout on a landscape screen and stack
+  gracefully on portrait or narrow displays.
+- **Countdown blur toggle** — `backdrop-filter: blur()` is opt-in via
+  `"ui": { "countdown_blur": true }` in `config.json` (disabled by default to
+  stay lightweight).  The server injects a `window.__cfg` JSON object into
+  `index.html` at request time; JS reads it at startup and sets a CSS variable.
+- **Separate output directories** — raw individual shots go to `output/raw/`,
+  final composites/collages go to `output/composites/`.  Both keys are
+  configurable; the old `output_dir` key is accepted as a fallback for
+  backwards compatibility.
+- **Kiosk deployment guide** — moved from the roadmap into `docs/kiosk.md`
+  (systemd, Chromium autostart, unclutter, screen blanking, SIGHUP hot-reload).
+  `README.md` now links to it.
+
+### config.json additions
+```json
+{
+  "ui": {
+    "countdown_blur": false
+  },
+  "storage": {
+    "local_disk": {
+      "raw_dir": "output/raw/",
+      "composite_dir": "output/composites/",
+      "filename_format": "photo_{timestamp}_{uuid}.jpg"
+    }
+  }
+}
+```
+
+### Tests
+Three new tests in `tests/test_storage_local.py`:
+- `test_raw_goes_to_raw_dir` — raw frames land in `raw_dir`
+- `test_composite_goes_to_composite_dir` — composites land in `composite_dir`
+- `test_is_configured_with_raw_dir` — `is_configured()` recognises new key
+
+---
+
+## Phase 11 — DSLR Backend Field Test `[TODO]`
+
+**Goal:** Verify the `dslr_gphoto2` camera backend on a real Canon EOS 650D
+connected via USB to a Linux laptop.  All earlier phases were developed and
+tested with the webcam/virtual fallback.
+
+### Deliverables
+- Set `"backend": "dslr_gphoto2"` in `config.json` and run `python run.py`
+- Verify `gphoto2` auto-detects the camera (`gphoto2 --auto-detect`)
+- Capture at least one 4-shot strip and confirm composite is saved to
+  `output/composites/`
+- Document any Canon-specific quirks (focus mode, mirror lock-up, capture delay)
+  in `docs/dslr_setup.md`
+- If capture fails, add retry logic with configurable `capture_retries` in
+  the gphoto2 backend
+
+### Non-goals
+- Do **not** change the webcam backend or state machine
+- Do **not** add RAW (CR2/CR3) support yet — JPEG-from-camera only
+

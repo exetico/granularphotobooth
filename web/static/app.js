@@ -22,6 +22,12 @@
   const btnRetake         = document.getElementById("btn-retake");
   const toastContainer    = document.getElementById("toast-container");
 
+  // ─── Runtime config (injected by server into index.html) ──────────
+  const runtimeCfg = window.__cfg || {};
+  if (runtimeCfg.countdown_blur) {
+    document.documentElement.style.setProperty("--countdown-blur", "blur(6px)");
+  }
+
   // ─── WebSocket setup ───────────────────────────────────────────────
   let ws = null;
   let reconnectDelay = 1000;
