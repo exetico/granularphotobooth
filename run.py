@@ -14,6 +14,7 @@ import signal
 import sys
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
+RESTART = 75  # internal: main() asks to be re-executed
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -79,8 +80,23 @@ async def main(config_path: str, args=None) -> int:
     logger = logging.getLogger("run")
     logger.info("GranularPhotoBooth %s — config %s", __version__, config_path)
 
+    from web.admin import load_or_create_token
+
     broker = Broker(config)
-    server = WebServer(config, broker)
+
+    def _on_reload(new_cfg: dict) -> None:
+        broker.reload_config(_apply_overrides(new_cfg, args) if args else new_cfg)
+
+    try:
+        admin_token = load_or_create_token(os.path.join(APP_DIR, "admin_token.txt"))
+    except OSError as exc:
+        logger.warning("Cannot store admin token (%s) — using a temporary one", exc)
+        admin_token = None
+    server = WebServer(config, broker, config_path=config_path, on_config=_on_reload,
+                       admin_token=admin_token)
+    shown_host = "localhost" if config["app"]["host"] in ("0.0.0.0", "127.0.0.1", "::") else config["app"]["host"]
+    logger.info("Admin panel: http://%s:%s/admin#token=%s", shown_host, config["app"]["port"],
+                server.admin_auth.token)
     loop = asyncio.get_running_loop()
 
     def _handle_signal(sig_name: str) -> None:
@@ -109,9 +125,6 @@ async def main(config_path: str, args=None) -> int:
                      exc_info=context.get("exception"))
     loop.set_exception_handler(_exception_handler)
 
-    def _on_reload(new_cfg: dict) -> None:
-        broker.reload_config(_apply_overrides(new_cfg, args) if args else new_cfg)
-
     broker_task = asyncio.create_task(broker.run(), name="broker")
     server_task = asyncio.create_task(server.run(), name="web")
     watch_task = asyncio.create_task(loader.watch(_on_reload), name="config-watch")
@@ -130,6 +143,9 @@ async def main(config_path: str, args=None) -> int:
         _, still = await asyncio.wait(pending, timeout=10)
         for t in still:
             t.cancel()
+    if broker.restart_requested:
+        logger.info("Restarting…")
+        return RESTART
     logger.info("Bye")
     return exit_code
 
@@ -147,6 +163,10 @@ if __name__ == "__main__":
         from core.doctor import run_doctor
         sys.exit(run_doctor(config_path, args.camera))
     try:
-        sys.exit(asyncio.run(main(config_path, args)))
+        code = asyncio.run(main(config_path, args))
+        if code == RESTART:
+            logging.shutdown()
+            os.execv(sys.executable, [sys.executable, os.path.join(APP_DIR, "run.py")] + sys.argv[1:])
+        sys.exit(code)
     except KeyboardInterrupt:
         sys.exit(0)

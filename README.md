@@ -115,6 +115,25 @@ output/composites/rejected/…                    ← results the guest pressed 
 
 ---
 
+## Admin panel
+
+Change settings, test the camera and restart the booth from a browser —
+no terminal or JSON editing needed.
+
+* **From the kiosk itself:** set an `admin.pin` (at least 8 digits) in
+  `config.json`, then tap the **top-left corner of the screen 5 times** and
+  enter the PIN.  5 wrong PINs lock PIN login for 5 minutes.
+* **From the operator's computer:** open the link printed in the log at
+  start-up — `http://localhost:8080/admin#token=…` (the token is stored in
+  `admin_token.txt`, never committed).  With a keyboard: Ctrl+Shift+A.
+
+What it can do: live status (camera, disk, sessions, last error), take a
+test photo, reconnect the camera, restart the app, edit the common settings
+(photos per session, countdowns, layout, background/overlay image, camera,
+all screen texts, PIN), upload overlay/background images, browse the latest
+photos, read the log, and edit the full `config.json` (validated, with a
+`config.json.bak` backup).  Changes apply from the next session.
+
 ## Running as a service
 
 * **Linux:** `scripts/photobooth.service` (systemd, auto-restart) — see [`docs/kiosk.md`](docs/kiosk.md)

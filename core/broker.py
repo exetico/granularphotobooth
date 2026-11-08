@@ -116,6 +116,13 @@ class Broker:
         self._ws_clients.discard(ws)
         logger.debug("WebSocket client disconnected (total: %d)", len(self._ws_clients))
 
+    restart_requested = False
+
+    def request_restart(self) -> None:
+        """Shut down; run.py then starts the app again (admin panel)."""
+        self.restart_requested = True
+        self.request_shutdown()
+
     def request_shutdown(self) -> None:
         self._shutdown_event.set()
         self._trigger_event.set()  # wake anything waiting
@@ -190,6 +197,16 @@ class Broker:
             "clients": len(self._ws_clients),
         }
 
+    async def test_capture(self) -> str:
+        """Take one test photo (admin panel).  Not saved to the output folders."""
+        if self._state is not State.IDLE:
+            raise RuntimeError("The booth is busy — try again when it is on the start screen")
+        if self._camera is None or not self._camera.connected:
+            raise RuntimeError(self._camera.status.get("message") if self._camera else "No camera")
+        data = await self._camera.capture()
+        name = f"test_{datetime.now().strftime('%H%M%S')}_{uuid.uuid4().hex[:4]}.jpg"
+        return await self._cache_screen(name, data)
+
     def get_screen_image(self, name: str) -> bytes | None:
         return self._screen_cache.get(name)
 
@@ -203,6 +220,9 @@ class Broker:
         Changes take effect on the *next* session — never mid-capture.
         ``app.host`` / ``app.port`` require a restart.
         """
+        if new_config == self._config:
+            logger.debug("Config unchanged — nothing to reload")
+            return
         if self._state is not State.IDLE:
             logger.info("Config reload queued — will apply after current session ends")
             self._pending_config = new_config

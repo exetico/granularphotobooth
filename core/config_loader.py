@@ -35,6 +35,13 @@ _SCHEMA: dict = {
                 "min_free_disk_mb": _num,
             },
         },
+        "admin": {
+            "type": "object",
+            "properties": {
+                "pin": {"type": "string", "pattern": "^([0-9]{8,})?$"},
+                "corner_taps": {"type": "integer", "minimum": 0, "maximum": 20},
+            },
+        },
         "ui": {
             "type": "object",
             "properties": {

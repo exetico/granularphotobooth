@@ -128,3 +128,6 @@ img { -webkit-user-drag: none; user-select: none; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   .big-start, #countdown-number.tick, #shot-img, #review-img { animation: none; }
 }
+
+/* Invisible admin hotspot (top-left corner) */
+#admin-hotspot { position: fixed; left: 0; top: 0; width: 90px; height: 90px; z-index: 100; background: transparent; }

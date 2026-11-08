@@ -364,7 +364,14 @@ time, locked-down self-healing kiosk UI, overlay layouts, config defaults,
 `--doctor`, simulated camera, soak test, install/kiosk scripts.
 Next steps are tracked in [`docs/TODO.md`](TODO.md).
 
-## Phase 13 - Admin Settings in UI `[TODO]`
+## Phase 13 - Admin Settings in UI `[DONE – 0.12.0]`
+
+Implemented as described below, with these differences: the PIN (8+ digits,
+`admin.pin`) gives a 12-hour session token instead of being combined with the
+master token; config changes are always persisted (atomically, with
+`config.json.bak`); restart uses `os.execv` from `run.py` after a clean
+shutdown.  Code: `web/admin.py`, `web/static/admin.*`, tests in
+`tests/test_admin_api.py`.
 
 ### Admin Panel — Minimal & Secure (proof-of-concept)
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.0 — Admin panel
+
+- `/admin`: status, test photo, reconnect camera, restart app, settings form,
+  overlay/background upload, latest photos, log viewer, raw `config.json` editor.
+- Access with the master token (`admin_token.txt`, link printed at start-up) or
+  an optional PIN (`admin.pin`, 8+ digits) via 5 taps in the kiosk's top-left
+  corner; PIN lockout after 5 wrong attempts; Ctrl+Shift+A shortcut.
+- Config saves are validated, written atomically, backed up to `config.json.bak`
+  and applied from the next session.  Only changed values are written.
+- Restart re-executes the app in place (works under systemd / launchd).
+
 ## 0.11.0 — Stability release
 
 ### Fixed

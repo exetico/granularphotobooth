@@ -339,6 +339,27 @@
     wake();
   }
 
+  // ── Hidden admin access: tap the top-left corner N times ────────────
+  const cornerTaps = Number(cfg.admin_corner_taps) || 0;
+  if (cornerTaps > 0) {
+    const hot = document.createElement("div");
+    hot.id = "admin-hotspot";
+    document.body.appendChild(hot);
+    let taps = [];
+    hot.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const now = Date.now();
+      taps = taps.filter((t) => now - t < 3000);
+      taps.push(now);
+      if (taps.length >= cornerTaps && (view.state === "IDLE" || !view.connected)) location.href = "/admin";
+    });
+  }
+  // Operators with a keyboard: Ctrl+Shift+A
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && (e.key === "A" || e.key === "a")) location.href = "/admin";
+  }, true);
+
   // ── Toasts ─────────────────────────────────────────────────────────
   function showToast(message, isError = false) {
     el.toasts.innerHTML = "";

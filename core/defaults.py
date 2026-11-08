@@ -19,6 +19,12 @@ DEFAULTS: dict[str, Any] = {
         "log_file": "logs/photobooth.log",
         "min_free_disk_mb": 500,
     },
+    "admin": {
+        # At least 8 digits to allow opening the admin panel from the kiosk
+        # (tap the top-left corner 5 times).  Empty = only via the token URL.
+        "pin": "",
+        "corner_taps": 5,
+    },
     "ui": {
         "countdown_blur": False,
         "mirror_preview": True,

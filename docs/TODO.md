@@ -28,10 +28,12 @@ for how it is used · **P2** = nice to have / hardening
 
 ## P1 — dslrBooth parity
 
-- [ ] **Admin panel** (roadmap Phase 13): PIN-protected page (hidden 5-tap corner
-      gesture on the kiosk) to change shots / countdown / layout, test the
-      camera, see last photos & status, restart/shutdown.  Must write
-      `config.json` atomically and validate before saving.
+- [x] **Admin panel** (Phase 13, 0.12.0): token URL + PIN with lockout, corner
+      gesture, status, test photo, reconnect, restart, settings form, image
+      upload, photo browser, log viewer, validated config.json editor.
+- [ ] Admin panel follow-ups: event-folder switcher, layout preview with
+      sample photos, "shut down computer" button (needs OS permission),
+      download all photos as ZIP.
 - [ ] **Event folders:** `storage.event_name` → `output/<event>/raw|composites`,
       switchable from the admin panel.
 - [ ] **Multiple layouts / modes chosen by the guest** (e.g. "1 photo" vs

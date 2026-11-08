@@ -13,3 +13,6 @@ build/
 htmlcov/
 *.log
 logs/
+admin_token.txt
+config.json.bak
+assets/uploads/

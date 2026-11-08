@@ -7,6 +7,10 @@
     "log_file": "logs/photobooth.log",
     "min_free_disk_mb": 500
   },
+  "admin": {
+    "pin": "",
+    "corner_taps": 5
+  },
   "ui": {
     "countdown_blur": false,
     "mirror_preview": true,

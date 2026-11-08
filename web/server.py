@@ -10,6 +10,7 @@ Routes:
   - ``GET /output/…``      → saved photos (raw + composites)
   - ``GET /api/status``    → JSON health/status for operators & monitoring
   - ``GET /healthz``       → 200 when the app is up (for watchdogs)
+  - ``GET /admin``         → admin panel (see ``web/admin.py`` for the API)
 """
 
 import asyncio
@@ -20,7 +21,10 @@ import re
 
 from aiohttp import web
 
+import secrets
+
 from core.paths import output_dirs, output_root
+from web.admin import AdminAuth, AdminRoutes
 from core.version import __version__
 
 logger = logging.getLogger(__name__)
@@ -37,7 +41,7 @@ async def _headers_middleware(request: web.Request, handler):
         response = exc
     if isinstance(response, web.StreamResponse) and not response.prepared:
         path = request.path
-        if path == "/" or path.startswith("/static/") or path.startswith("/api/"):
+        if path in ("/", "/admin") or path.startswith(("/static/", "/api/")):
             # The kiosk must always run the code that matches the backend
             response.headers["Cache-Control"] = "no-store"
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -50,12 +54,19 @@ async def _headers_middleware(request: web.Request, handler):
 class WebServer:
     """aiohttp-based HTTP + WebSocket server."""
 
-    def __init__(self, config: dict, broker) -> None:
+    def __init__(self, config: dict, broker, config_path: str | None = None,
+                 on_config=None, admin_token: str | None = None) -> None:
         self._config = config
         self._broker = broker
-        self._app = web.Application(middlewares=[_headers_middleware])
+        self._app = web.Application(middlewares=[_headers_middleware], client_max_size=30 * 1024 * 1024)
         self._runner: web.AppRunner | None = None
         self._setup_routes()
+        self.admin_auth = AdminAuth(
+            admin_token or secrets.token_urlsafe(32),
+            lambda: self._broker.config.get("admin", {}).get("pin"),
+        )
+        AdminRoutes(self._app, broker, config_path, on_config or broker.reload_config,
+                    self.admin_auth, _STATIC_DIR)
 
     @property
     def app(self) -> web.Application:
@@ -81,6 +92,8 @@ class WebServer:
         ui["kiosk_mode"] = bool(cfg.get("app", {}).get("kiosk_mode", False))
         ui["boot_id"] = getattr(self._broker, "boot_id", "")
         ui["version"] = __version__
+        admin = cfg.get("admin", {})
+        ui["admin_corner_taps"] = int(admin.get("corner_taps", 5)) if admin.get("pin") else 0
         return ui
 
     async def _index(self, request: web.Request) -> web.Response:

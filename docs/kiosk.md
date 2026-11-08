@@ -14,6 +14,9 @@ handled by running the browser in `--kiosk` mode on a dedicated user account.
 
 **Operator exit:** plug in a keyboard and press Alt+F4 (Linux) / Cmd+Q (macOS).
 
+**Admin panel on the kiosk:** set `admin.pin` (8+ digits) and tap the
+top-left corner 5 times → PIN pad → settings, test photo, restart.
+
 ## macOS kiosk
 
 1. Create a separate standard user "booth" with automatic login.
