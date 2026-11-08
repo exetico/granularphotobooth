@@ -1,15 +1,29 @@
 {
   "app": {
-    "host": "0.0.0.0",
+    "host": "127.0.0.1",
     "port": 8080,
-    "debug": true,
-    "kiosk_mode": false
+    "debug": false,
+    "kiosk_mode": false,
+    "log_file": "logs/photobooth.log",
+    "min_free_disk_mb": 500
   },
   "ui": {
-    "countdown_blur": false
+    "countdown_blur": false,
+    "mirror_preview": true,
+    "trigger_keys": ["Space", "Enter", "NumpadEnter", "PageDown", "PageUp"],
+    "tap_anywhere_to_start": true,
+    "lock_ui": true,
+    "texts": {
+      "idle": "Tap anywhere to start",
+      "smile": "Smile!"
+    }
   },
   "camera": {
     "backend": "webcam",
+    "fallback_to_webcam": false,
+    "capture_timeout_seconds": 30,
+    "capture_retries": 2,
+    "preview_fps": 15,
     "backends": {
       "webcam": {
         "device_index": 0,
@@ -18,33 +32,47 @@
       },
       "dslr_gphoto2": {
         "model_hint": "Canon EOS 650D",
-        "iso": "400",
-        "aperture": "5.6",
-        "shutter_speed": "1/125"
+        "liveview": true,
+        "kill_ptpcamera_on_macos": true,
+        "delete_after_download": false,
+        "iso": "",
+        "aperture": "",
+        "shutter_speed": ""
       },
       "ip_cam": {
-        "stream_url": "http://192.168.1.x:8080/video"
+        "stream_url": "",
+        "snapshot_url": ""
+      },
+      "dummy": {
+        "resolution": [1800, 1200]
       }
     }
   },
   "input": {
-    "triggers": ["keyboard", "websocket_button"],
+    "triggers": ["websocket_button"],
     "keyboard": {
       "trigger_key": "space"
-    }
+    },
+    "debounce_ms": 800
   },
   "sequence": {
     "shots": 4,
     "countdown_seconds": 3,
-    "preview_duration_seconds": 8,
-    "delay_between_shots_seconds": 2
+    "first_countdown_seconds": 5,
+    "show_shot_seconds": 1.5,
+    "delay_between_shots_seconds": 0,
+    "preview_duration_seconds": 12,
+    "retake_mode": "restart",
+    "max_session_seconds": 300
   },
   "compositor": {
     "enabled": true,
-    "template_image": "assets/layouts/4shot_strip.png",
+    "template_image": "",
+    "overlay_image": "",
     "template_map": "assets/layouts/4shot_strip.json",
+    "background_color": "#ffffff",
     "output_format": "JPEG",
-    "output_quality": 90
+    "output_quality": 92
   },
   "storage": {
     "targets": ["local_disk"],
@@ -52,7 +80,7 @@
       "enabled": true,
       "raw_dir": "output/raw/",
       "composite_dir": "output/composites/",
-      "filename_format": "photo_{timestamp}_{uuid}.jpg"
+      "filename_format": "{session}_{kind}.jpg"
     },
     "s3_minio": {
       "enabled": false,

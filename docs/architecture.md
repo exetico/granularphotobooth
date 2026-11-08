@@ -1,7 +1,7 @@
 # GranularPhotoBooth — Architecture & Design Decisions
 
-> **Status:** Implemented (Phase 0–8 complete)  
-> **Last updated:** 2026-08-30
+> **Status:** Implemented (Phase 0–12b complete)  
+> **Last updated:** 2026-11-08
 
 ---
 
@@ -11,7 +11,7 @@
 |---|---|
 | Granular & Modular | Every function is an isolated, swappable component behind an abstract base class |
 | Hardware Genesis (Linux Focus) | Lightweight Python async stack; works on recycled laptops running Linux |
-| Zero-Configuration First Run | Falls back to webcam automatically if selected backend is unavailable |
+| Zero-Configuration First Run | Built-in defaults for every setting; `--doctor` explains what is missing; optional webcam fallback |
 | No Bloat | No social media, no frameworks; vanilla HTML5/JS frontend, no build step |
 
 ---
@@ -145,3 +145,36 @@ camera.initialize()
 | Open redirect via `image_url` | Filename extracted with `split("/").pop()` + `^[\w\-.]+$` allow-list; always prefixed `/output/` |
 | Dynamic JS method dispatch | Replaced bracket-notation dispatch with explicit `switch` statement |
 | Secrets in config | `access_key` / `secret_key` / `password` fields are empty strings in the committed default |
+
+
+---
+
+## Stability architecture (0.11.0)
+
+```
+Browser ──ws──► web/server.py ──► core/broker.py (state machine, session time limit)
+   ▲  hello snapshot on connect       │
+   │  /preview (MJPEG) ◄── shared ────┤ cameras/manager.py  ── ONE camera thread
+   │  /media/<shot>.jpg  (screen-     │      timeouts · retries · reconnect loop
+   │   sized, in-memory cache)        │      └─ backend: webcam | dslr_gphoto2 | ip_cam | dummy
+   │                                  ├─ compositor/grid_layout.py (background → photos → overlay)
+   │                                  └─ storage/pipeline.py
+   │                                         local_disk  — synchronous, atomic, first
+   │                                         s3 / ftp    — background with retries
+```
+
+* **Flow:** `IDLE → (COUNTDOWN → CAPTURE) × shots → PROCESS → PREVIEW → IDLE`.
+  Each original is saved right after CAPTURE.  Retake (in PREVIEW) moves the
+  composite to `rejected/` and starts a new session (`retake_mode`).
+* **Camera thread:** backends are plain blocking classes.  The manager calls
+  them from a single-worker executor.  If a call exceeds its timeout the
+  executor is abandoned and replaced, and the camera is reopened.
+* **Live view:** one preview loop at `camera.preview_fps`, paused during
+  capture; every MJPEG viewer waits on the same `asyncio.Condition`.
+* **UI contract:** the server is the source of truth.  The page renders
+  `state_change`, `countdown_tick`, `shot_captured`, `camera_status`,
+  `disk_status` and `error` events; on reconnect it receives a `hello`
+  snapshot, and reloads if the server's `boot_id` changed.
+* **Config:** `config.json` is merged on top of `core/defaults.py` and
+  validated.  Changes apply when IDLE; the camera is only reopened when the
+  `camera` section changed.

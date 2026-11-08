@@ -127,27 +127,20 @@ async def test_confirm_only_in_preview():
     assert broker._trigger_event.is_set()
 
 
-# ── retake() moves to IDLE from PREVIEW ──────────────────────────────
+# ── retake() only acts in PREVIEW ────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_retake_from_preview():
+async def test_retake_only_in_preview():
     broker = Broker(_cfg())
+    broker._state = State.IDLE
+    await broker.retake()
+    assert not broker._trigger_event.is_set()
 
-    received_states = []
-
-    class FakeWS:
-        async def send_str(self, text):
-            import json
-            msg = json.loads(text)
-            if msg.get("event") == "state_change":
-                received_states.append(msg["state"])
-
-    broker.register_ws_client(FakeWS())
     broker._state = State.PREVIEW
     await broker.retake()
-
-    assert broker._state is State.IDLE
-    assert "IDLE" in received_states
+    assert broker._trigger_event.is_set()
+    assert broker._review_action == "retake"
+    # Full retake behaviour is covered end-to-end in test_session_flow.py
 
 
 # ── Shutdown event ────────────────────────────────────────────────────

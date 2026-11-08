@@ -107,3 +107,80 @@ class TestGridLayoutCompositor:
         comp = Compositor()
         with pytest.raises(ValueError):
             comp.compose([], {})
+
+
+# ── Overlay / repeat / EXIF ───────────────────────────────────────────
+
+def _jpeg(color, size=(400, 300), exif_orientation=None):
+    import io
+    from PIL import Image
+    img = Image.new("RGB", size, color)
+    buf = io.BytesIO()
+    if exif_orientation:
+        exif = Image.Exif()
+        exif[0x0112] = exif_orientation
+        img.save(buf, format="JPEG", exif=exif)
+    else:
+        img.save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+def _layout(tmp_path, **extra):
+    import json
+    layout = {"canvas_size": [200, 200], "slots": [
+        {"x": 0, "y": 0, "width": 100, "height": 100},
+        {"x": 100, "y": 100, "width": 100, "height": 100}]}
+    layout.update(extra)
+    p = tmp_path / "layout.json"
+    p.write_text(json.dumps(layout))
+    return str(p)
+
+
+def test_overlay_is_drawn_on_top(tmp_path):
+    import io
+    from PIL import Image
+    from compositor.grid_layout import Compositor
+    ov = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+    ov.putpixel((10, 10), (0, 0, 255, 255))
+    for x in range(5, 15):
+        for y in range(5, 15):
+            ov.putpixel((x, y), (0, 0, 255, 255))
+    ov.save(tmp_path / "ov.png")
+    out = Compositor().compose([_jpeg((255, 0, 0))], {
+        "template_map": _layout(tmp_path, overlay_image="ov.png")})
+    img = Image.open(io.BytesIO(out)).convert("RGB")
+    r, g, b = img.getpixel((10, 10))
+    assert b > 200 and r < 60          # overlay on top of the photo
+    r, g, b = img.getpixel((50, 50))
+    assert r > 200 and b < 60          # photo visible where overlay is transparent
+
+
+def test_repeat_frames_fills_all_slots(tmp_path):
+    import io
+    from PIL import Image
+    from compositor.grid_layout import Compositor
+    out = Compositor().compose([_jpeg((0, 255, 0))], {
+        "template_map": _layout(tmp_path, repeat_frames=True), "background_color": "#000000"})
+    img = Image.open(io.BytesIO(out)).convert("RGB")
+    assert img.getpixel((150, 150))[1] > 200
+
+
+def test_bad_layout_gives_clear_error(tmp_path):
+    import json
+    from compositor.grid_layout import load_layout
+    p = tmp_path / "bad.json"
+    p.write_text(json.dumps({"canvas_size": [10, 10], "slots": [{"x": 0}]}))
+    with pytest.raises(ValueError, match="slot 1"):
+        load_layout(str(p))
+
+
+def test_exif_rotation_is_applied(tmp_path):
+    import io
+    from PIL import Image
+    from compositor.grid_layout import Compositor
+    import json
+    p = tmp_path / "tall.json"
+    p.write_text(json.dumps({"canvas_size": [300, 400], "slots": [{"x": 0, "y": 0, "width": 300, "height": 400}]}))
+    # landscape image with "rotate 90" orientation → should become portrait without heavy cropping
+    out = Compositor().compose([_jpeg((255, 255, 0), size=(400, 300), exif_orientation=6)], {"template_map": str(p)})
+    assert Image.open(io.BytesIO(out)).size == (300, 400)

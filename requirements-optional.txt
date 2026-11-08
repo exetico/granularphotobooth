@@ -1,0 +1,6 @@
+# DSLR support — needs libgphoto2 first:
+#   Linux: sudo apt install libgphoto2-dev pkg-config
+#   macOS: brew install libgphoto2 pkg-config
+gphoto2>=2.5.0
+# S3 / MinIO upload target
+boto3>=1.28.0

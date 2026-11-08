@@ -107,3 +107,48 @@ def test_composite_goes_to_composite_dir(tmp_path):
 def test_is_configured_with_raw_dir():
     target = StorageTarget({"raw_dir": "/tmp/raw/", "filename_format": "photo_{timestamp}_{uuid}.jpg"})
     assert target.is_configured() is True
+
+
+# ── Session naming / safety ───────────────────────────────────────────
+
+def test_session_naming(tmp_path):
+    target = StorageTarget({"raw_dir": str(tmp_path / "r"), "composite_dir": str(tmp_path / "c")})
+    raw = target.upload(b"x", {"type": "raw", "frame": 2, "session_id": "S1"})
+    comp = target.upload(b"y", {"type": "composite", "session_id": "S1"})
+    assert raw.endswith("S1_shot2.jpg") and comp.endswith("S1_composite.jpg")
+
+
+def test_never_overwrites(tmp_path):
+    target = StorageTarget({"raw_dir": str(tmp_path), "filename_format": "same.jpg"})
+    a = target.upload(b"a", {"type": "raw", "frame": 1})
+    b = target.upload(b"b", {"type": "raw", "frame": 1})
+    assert a != b
+    assert open(a, "rb").read() == b"a" and open(b, "rb").read() == b"b"
+
+
+def test_legacy_format_gets_shot_suffix(tmp_path):
+    target = StorageTarget({"raw_dir": str(tmp_path), "filename_format": "photo_{timestamp}_{uuid}.jpg"})
+    path = target.upload(b"a", {"type": "raw", "frame": 3})
+    assert path.endswith("_shot3.jpg")
+
+
+def test_no_temp_files_left(tmp_path):
+    target = StorageTarget({"raw_dir": str(tmp_path)})
+    target.upload(b"a" * 1000, {"type": "raw", "frame": 1})
+    assert not [f for f in os.listdir(tmp_path) if f.endswith(".tmp")]
+
+
+def test_filename_cannot_escape_dir(tmp_path):
+    target = StorageTarget({"raw_dir": str(tmp_path / "r"), "filename_format": "../../{kind}.jpg"})
+    path = target.upload(b"a", {"type": "raw", "frame": 1})
+    assert os.path.dirname(path) == str(tmp_path / "r")
+
+
+def test_pipeline_local_failure_raises(tmp_path):
+    from storage.pipeline import StoragePipeline
+    blocker = tmp_path / "file"
+    blocker.write_text("not a dir")
+    pipe = StoragePipeline({"storage": {"targets": ["local_disk"], "local_disk": {
+        "raw_dir": str(blocker / "sub"), "composite_dir": str(blocker / "sub")}}})
+    with pytest.raises(RuntimeError):
+        pipe.store_local(b"x", {"type": "raw", "frame": 1})

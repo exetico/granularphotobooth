@@ -1,0 +1,29 @@
+# systemd unit for the GranularPhotoBooth backend (Linux).
+#
+# Install:
+#   sudo cp scripts/photobooth.service /etc/systemd/system/
+#   sudo sed -i "s|/opt/granularphotobooth|$PWD|; s|User=photobooth|User=$USER|" /etc/systemd/system/photobooth.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now photobooth
+#
+# Logs:  journalctl -u photobooth -f      (and logs/photobooth.log)
+# Reload config without restart:  sudo systemctl reload photobooth
+
+[Unit]
+Description=GranularPhotoBooth backend
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+User=photobooth
+# Access to USB cameras (gphoto2) and /dev/video*
+SupplementaryGroups=plugdev video
+WorkingDirectory=/opt/granularphotobooth
+ExecStart=/opt/granularphotobooth/.venv/bin/python run.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=2
+TimeoutStopSec=15
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,9 @@
-"""Abstract base class for all camera backends."""
+"""Abstract base class for all camera backends.
+
+Backends are plain, *blocking* objects.  They never need to be thread-safe:
+``cameras.manager.CameraManager`` calls every method from one dedicated
+camera thread, adds timeouts, retries and automatic reconnects.
+"""
 
 from abc import ABC, abstractmethod
 
@@ -33,6 +38,10 @@ class CameraBackend(ABC):
     @abstractmethod
     def get_preview_frame(self) -> bytes:
         """Return a low-resolution JPEG preview frame for the live view."""
+
+    def has_preview(self) -> bool:
+        """Return False if this backend cannot deliver a live view."""
+        return True
 
     @abstractmethod
     def release(self) -> None:
