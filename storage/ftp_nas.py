@@ -15,6 +15,16 @@ from storage.base import StorageTarget as _Base
 logger = logging.getLogger(__name__)
 
 
+def _remote_name(metadata: dict, timestamp: str, short_uuid: str) -> str:
+    """Same naming as local_disk when session info is available."""
+    session = metadata.get("session_id")
+    if not session:
+        return f"photo_{timestamp}_{short_uuid}.jpg"
+    if metadata.get("type") == "composite":
+        return f"{session}_composite.jpg"
+    return f"{session}_shot{int(metadata.get('frame', 0) or 0)}.jpg"
+
+
 class StorageTarget(_Base):
     """Upload the captured image via FTP to a network-attached storage."""
 
@@ -30,7 +40,7 @@ class StorageTarget(_Base):
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         short_uuid = str(uuid.uuid4()).replace("-", "")[:8]
-        filename = f"photo_{timestamp}_{short_uuid}.jpg"
+        filename = _remote_name(metadata, timestamp, short_uuid)
 
         remote_path = remote_dir.rstrip("/") + "/" + filename
 

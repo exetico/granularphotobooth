@@ -1,91 +1,151 @@
 """Lightweight aiohttp web server.
 
-Provides:
-  - ``GET /``             → serves ``web/static/index.html``
-  - ``GET /static/…``     → serves JS/CSS assets
-  - ``GET /output/…``     → serves captured images from the output directory
-  - ``GET /ws``           → WebSocket endpoint (bidirectional JSON protocol)
-  - ``GET /preview``      → MJPEG live-view stream
+Routes:
+  - ``GET /``              → kiosk UI (``web/static/index.html``)
+  - ``GET /static/…``      → JS/CSS assets
+  - ``GET /ws``            → WebSocket (bidirectional JSON protocol)
+  - ``GET /preview``       → MJPEG live view (shared, any number of viewers)
+  - ``GET /preview.jpg``   → latest single live-view frame
+  - ``GET /media/{name}``  → screen-sized versions of the photos just taken
+  - ``GET /output/…``      → saved photos (raw + composites)
+  - ``GET /api/status``    → JSON health/status for operators & monitoring
+  - ``GET /healthz``       → 200 when the app is up (for watchdogs)
+  - ``GET /admin``         → admin panel (see ``web/admin.py`` for the API)
 """
 
 import asyncio
-import base64
 import json
 import logging
 import os
+import re
 
 from aiohttp import web
+
+import secrets
+
+from core.paths import output_dirs, output_root
+from web.admin import AdminAuth, AdminRoutes
+from core.version import __version__
 
 logger = logging.getLogger(__name__)
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-_WEB_DIR = os.path.dirname(__file__)
+_MEDIA_NAME = re.compile(r"^[\w\-.]+\.jpg$")
+
+
+@web.middleware
+async def _headers_middleware(request: web.Request, handler):
+    try:
+        response = await handler(request)
+    except web.HTTPException as exc:
+        response = exc
+    if isinstance(response, web.StreamResponse) and not response.prepared:
+        path = request.path
+        if path in ("/", "/admin") or path.startswith(("/static/", "/api/")):
+            # The kiosk must always run the code that matches the backend
+            response.headers["Cache-Control"] = "no-store"
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+    if isinstance(response, web.HTTPException):
+        raise response
+    return response
 
 
 class WebServer:
     """aiohttp-based HTTP + WebSocket server."""
 
-    def __init__(self, config: dict, broker) -> None:
+    def __init__(self, config: dict, broker, config_path: str | None = None,
+                 on_config=None, admin_token: str | None = None) -> None:
         self._config = config
         self._broker = broker
-        self._app = web.Application()
+        self._app = web.Application(middlewares=[_headers_middleware], client_max_size=30 * 1024 * 1024)
         self._runner: web.AppRunner | None = None
         self._setup_routes()
+        self.admin_auth = AdminAuth(
+            admin_token or secrets.token_urlsafe(32),
+            lambda: self._broker.config.get("admin", {}).get("pin"),
+        )
+        AdminRoutes(self._app, broker, config_path, on_config or broker.reload_config,
+                    self.admin_auth, _STATIC_DIR)
+
+    @property
+    def app(self) -> web.Application:
+        return self._app
 
     def _setup_routes(self) -> None:
-        self._app.router.add_get("/", self._index)
-        self._app.router.add_get("/ws", self._websocket_handler)
-        self._app.router.add_get("/preview", self._preview_handler)
-        self._app.router.add_static("/static", _STATIC_DIR)
-        disk_cfg = self._config["storage"].get("local_disk", {})
-        # Support both new split-dir config and old single output_dir
-        raw_dir = disk_cfg.get("raw_dir", disk_cfg.get("output_dir", "output/raw/"))
-        composite_dir = disk_cfg.get("composite_dir", disk_cfg.get("output_dir", "output/composites/"))
-        for d in (raw_dir, composite_dir):
-            os.makedirs(os.path.abspath(d), exist_ok=True)
-        # Serve /output/raw and /output/composites (and the parent for compat)
-        parent = os.path.abspath(os.path.commonpath([raw_dir, composite_dir]))
-        os.makedirs(parent, exist_ok=True)
-        self._app.router.add_static("/output", parent)
+        r = self._app.router
+        r.add_get("/", self._index)
+        r.add_get("/ws", self._websocket_handler)
+        r.add_get("/preview", self._preview_handler)
+        r.add_get("/preview.jpg", self._preview_still)
+        r.add_get("/media/{name}", self._media)
+        r.add_get("/api/status", self._status)
+        r.add_get("/healthz", self._healthz)
+        r.add_static("/static", _STATIC_DIR)
+        for d in output_dirs(self._config):
+            os.makedirs(d, exist_ok=True)
+        r.add_static("/output", output_root(self._config))
+
+    def _ui_config(self) -> dict:
+        cfg = self._broker.config if hasattr(self._broker, "config") else self._config
+        ui = dict(cfg.get("ui", {}))
+        ui["kiosk_mode"] = bool(cfg.get("app", {}).get("kiosk_mode", False))
+        ui["boot_id"] = getattr(self._broker, "boot_id", "")
+        ui["version"] = __version__
+        admin = cfg.get("admin", {})
+        ui["admin_corner_taps"] = int(admin.get("corner_taps", 5)) if admin.get("pin") else 0
+        return ui
 
     async def _index(self, request: web.Request) -> web.Response:
         index_path = os.path.join(_STATIC_DIR, "index.html")
         with open(index_path, encoding="utf-8") as fh:
             html = fh.read()
-        # Inject runtime config as a JSON object so the frontend can read it
-        # without a separate API call.
-        ui_cfg = {
-            "countdown_blur": self._config.get("ui", {}).get("countdown_blur", False),
-        }
-        html = html.replace(
-            "<!-- RUNTIME_CONFIG -->",
-            f'<script>window.__cfg = {json.dumps(ui_cfg)};</script>',
-        )
+        payload = json.dumps(self._ui_config()).replace("</", "<\\/")
+        html = html.replace("<!-- RUNTIME_CONFIG -->", f"<script>window.__cfg = {payload};</script>")
         return web.Response(text=html, content_type="text/html")
 
+    async def _status(self, request: web.Request) -> web.Response:
+        return web.json_response(self._broker.status())
+
+    async def _healthz(self, request: web.Request) -> web.Response:
+        return web.Response(text="ok")
+
+    async def _media(self, request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        if not _MEDIA_NAME.match(name):
+            raise web.HTTPNotFound()
+        data = self._broker.get_screen_image(name)
+        if data is None:
+            raise web.HTTPNotFound()
+        return web.Response(body=data, content_type="image/jpeg",
+                            headers={"Cache-Control": "private, max-age=3600"})
+
     async def _websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
-        ws = web.WebSocketResponse()
+        ws = web.WebSocketResponse(heartbeat=15, max_msg_size=64 * 1024)
         await ws.prepare(request)
 
         self._broker.register_ws_client(ws)
         logger.debug("WebSocket connection established from %s", request.remote)
-
         try:
+            await ws.send_str(json.dumps(self._broker.snapshot()))
             async for msg in ws:
                 if msg.type == web.WSMsgType.TEXT:
                     await self._handle_ws_message(ws, msg.data)
                 elif msg.type in (web.WSMsgType.ERROR, web.WSMsgType.CLOSE):
                     break
+        except Exception as exc:
+            logger.debug("WebSocket closed with error: %s", exc)
         finally:
             self._broker.unregister_ws_client(ws)
-
         return ws
 
     async def _handle_ws_message(self, ws, raw: str) -> None:
         try:
             message = json.loads(raw)
         except json.JSONDecodeError:
-            logger.warning("Received invalid JSON over WebSocket: %r", raw)
+            logger.warning("Received invalid JSON over WebSocket: %r", raw[:200])
+            return
+        if not isinstance(message, dict):
             return
 
         event = message.get("event")
@@ -95,49 +155,70 @@ class WebServer:
             await self._broker.confirm()
         elif event == "retake":
             await self._broker.retake()
+        elif event == "hello":
+            await ws.send_str(json.dumps(self._broker.snapshot()))
+        elif event == "client_error":
+            logger.warning("Browser error: %s", str(message.get("message"))[:500])
         else:
             logger.debug("Unknown WebSocket event: %s", event)
 
     async def _preview_handler(self, request: web.Request) -> web.StreamResponse:
-        """MJPEG live-view endpoint.  Streams preview frames to the browser."""
+        """MJPEG live-view endpoint.  All viewers share one camera reader."""
         response = web.StreamResponse(
             headers={
                 "Content-Type": "multipart/x-mixed-replace; boundary=frame",
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-cache, no-store",
+                "Connection": "close",
             }
         )
         await response.prepare(request)
-
+        last_id = -1
         try:
-            while not response.task.done():
-                frame = await self._broker.get_preview_frame()
-                if frame is None:
-                    await asyncio.sleep(0.1)
+            while not self._broker.is_shutdown_requested():
+                camera = self._broker.camera
+                if camera is None:
+                    await asyncio.sleep(0.25)
                     continue
-                boundary = (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n"
+                last_id, frame = await camera.wait_frame(last_id, timeout=2.0)
+                if frame is None:
+                    continue
+                await response.write(
+                    b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                    + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n"
                 )
-                await response.write(boundary + frame + b"\r\n")
-                await asyncio.sleep(0.05)  # ~20 fps
         except (ConnectionResetError, asyncio.CancelledError):
             pass
-
+        except Exception as exc:
+            logger.debug("Preview stream ended: %s", exc)
         return response
+
+    async def _preview_still(self, request: web.Request) -> web.Response:
+        camera = self._broker.camera
+        frame = camera.latest_frame() if camera else None
+        if frame is None:
+            raise web.HTTPServiceUnavailable(text="no frame")
+        return web.Response(body=frame, content_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
     async def run(self) -> None:
         host: str = self._config["app"]["host"]
         port: int = self._config["app"]["port"]
 
-        self._runner = web.AppRunner(self._app)
+        self._runner = web.AppRunner(self._app, handle_signals=False, shutdown_timeout=2)
         await self._runner.setup()
-        site = web.TCPSite(self._runner, host, port)
-        await site.start()
-        logger.info("Web server running at http://%s:%d", host, port)
+        site = web.TCPSite(self._runner, host, port, reuse_address=True)
+        try:
+            await site.start()
+        except OSError as exc:
+            logger.critical("Cannot listen on %s:%s — %s (is the booth already running?)", host, port, exc)
+            self._broker.request_shutdown()
+            await self._runner.cleanup()
+            raise
+        shown = "localhost" if host in ("0.0.0.0", "127.0.0.1", "::") else host
+        logger.info("Web server running — open http://%s:%d", shown, port)
 
-        # Keep alive until the broker requests shutdown
-        while not self._broker.is_shutdown_requested():
-            await asyncio.sleep(0.5)
-
-        await self._runner.cleanup()
-        logger.info("Web server stopped")
+        try:
+            while not self._broker.is_shutdown_requested():
+                await asyncio.sleep(0.5)
+        finally:
+            await self._runner.cleanup()
+            logger.info("Web server stopped")

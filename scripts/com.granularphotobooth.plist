@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent for macOS: starts the booth at login and restarts it if it crashes.
+
+  Install:
+    sed "s|/opt/granularphotobooth|$PWD|g" scripts/com.granularphotobooth.plist \
+      > ~/Library/LaunchAgents/com.granularphotobooth.plist
+    launchctl load -w ~/Library/LaunchAgents/com.granularphotobooth.plist
+  Stop:
+    launchctl unload ~/Library/LaunchAgents/com.granularphotobooth.plist
+
+  macOS asks for camera permission the first time: allow it for "python".
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.granularphotobooth</string>
+  <key>WorkingDirectory</key><string>/opt/granularphotobooth</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/granularphotobooth/.venv/bin/python</string>
+    <string>run.py</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>3</integer>
+  <key>StandardOutPath</key><string>/opt/granularphotobooth/logs/stdout.log</string>
+  <key>StandardErrorPath</key><string>/opt/granularphotobooth/logs/stdout.log</string>
+</dict>
+</plist>

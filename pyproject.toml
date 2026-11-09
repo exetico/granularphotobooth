@@ -1,5 +1,13 @@
+[project]
+name = "granularphotobooth"
+version = "0.12.0"
+description = "Stable, component-based photo booth for Linux and macOS (webcam, DSLR via gphoto2, IP cam)"
+requires-python = ">=3.10"
+readme = "README.md"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]

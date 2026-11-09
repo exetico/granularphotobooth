@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Booth Admin</title>
+  <link rel="stylesheet" href="/static/admin.css" />
+</head>
+<body>
+  <header>
+    <h1>📷 Booth Admin</h1>
+    <span id="state-pill" class="pill">…</span>
+    <span class="spacer"></span>
+    <a class="btn ghost" href="/">← Back to booth</a>
+    <button id="btn-logout" class="btn ghost hidden" type="button">Log out</button>
+  </header>
+
+  <!-- Login -->
+  <main id="login" class="hidden">
+    <section class="card narrow">
+      <h2>Enter PIN</h2>
+      <div id="pin-area">
+        <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="PIN" />
+        <div id="pinpad"></div>
+        <p id="login-error" class="error"></p>
+      </div>
+      <p id="no-pin" class="muted hidden">
+        PIN login is not enabled. Open the admin link printed in the log when the
+        booth starts (<code>logs/photobooth.log</code>), or the token in
+        <code>admin_token.txt</code>: <code>http://localhost:8080/admin#token=…</code>
+      </p>
+    </section>
+  </main>
+
+  <!-- Dashboard -->
+  <main id="dash" class="hidden">
+    <div id="flash-msg" class="flash hidden"></div>
+
+    <section class="card">
+      <h2>Status</h2>
+      <dl id="status-list" class="status-grid"></dl>
+      <div class="row">
+        <button id="btn-test" class="btn" type="button">Take test photo</button>
+        <button id="btn-reconnect" class="btn" type="button">Reconnect camera</button>
+        <button id="btn-restart" class="btn danger" type="button">Restart app</button>
+      </div>
+      <div id="test-result" class="hidden"><img id="test-img" alt="Test photo" /></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Settings</h2>
+        <button id="btn-save" class="btn primary" type="button">Save settings</button>
+      </div>
+      <form id="settings" autocomplete="off"></form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Layout images</h2>
+        <label class="btn">Upload PNG/JPG<input id="upload" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" hidden /></label>
+      </div>
+      <p class="muted">Upload a background (under the photos) or a transparent PNG overlay (on top: logo,
+        frame, text) at the layout's canvas size, then choose it under Settings → Layout.</p>
+      <ul id="image-list" class="file-list"></ul>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Latest photos</h2>
+        <span id="photo-count" class="muted"></span>
+      </div>
+      <div id="photos" class="photo-grid"></div>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary><h2>Advanced: edit config.json</h2></summary>
+        <p class="muted">Only the values you set are stored; everything else uses the built-in defaults.
+          The previous version is kept as <code>config.json.bak</code>.</p>
+        <textarea id="raw-config" spellcheck="false"></textarea>
+        <div class="row"><button id="btn-save-raw" class="btn primary" type="button">Save config.json</button></div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details id="logs-details">
+        <summary><h2>Log</h2></summary>
+        <div class="row"><button id="btn-logs" class="btn" type="button">Refresh</button></div>
+        <pre id="logs"></pre>
+      </details>
+    </section>
+  </main>
+
+  <script src="/static/admin.js"></script>
+</body>
+</html>

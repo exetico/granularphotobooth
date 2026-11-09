@@ -324,9 +324,11 @@ python run.py
 }
 ```
 
-## Phase 11 — Tests as part of Pull Requests on GitHub
+## Phase 11 — Tests as part of Pull Requests on GitHub `[DONE]`
 
-Make tests run on GitHub, as part of pull request.
+`.github/workflows/tests.yml` runs the test-suite plus a `--doctor` smoke
+test on Ubuntu and macOS with Python 3.10, 3.12 and 3.13 for every pull
+request and every push to `main`.
 
 ## Phase 12 — Tests: DSLR Backend Field Test `[TODO]`
 
@@ -354,7 +356,22 @@ Three new tests in `tests/test_storage_local.py`:
 - `test_composite_goes_to_composite_dir` — composites land in `composite_dir`
 - `test_is_configured_with_raw_dir` — `is_configured()` recognises new key
 
-## Phase 13 - Admin Settings in UI
+## Phase 12b — Stability release (0.11.0) `[DONE – NEEDS FIELD TEST]`
+
+See `CHANGELOG.md` for the full list.  Highlights: `CameraManager` (single
+camera thread, timeouts, retries, auto-reconnect), originals saved at capture
+time, locked-down self-healing kiosk UI, overlay layouts, config defaults,
+`--doctor`, simulated camera, soak test, install/kiosk scripts.
+Next steps are tracked in [`docs/TODO.md`](TODO.md).
+
+## Phase 13 - Admin Settings in UI `[DONE – 0.12.0]`
+
+Implemented as described below, with these differences: the PIN (8+ digits,
+`admin.pin`) gives a 12-hour session token instead of being combined with the
+master token; config changes are always persisted (atomically, with
+`config.json.bak`); restart uses `os.execv` from `run.py` after a clean
+shutdown.  Code: `web/admin.py`, `web/static/admin.*`, tests in
+`tests/test_admin_api.py`.
 
 ### Admin Panel — Minimal & Secure (proof-of-concept)
 

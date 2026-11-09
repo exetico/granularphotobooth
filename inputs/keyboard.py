@@ -7,6 +7,13 @@ loop so the broker can be called safely.
 
 Supported key names: any character (``"a"``, ``" "``) or a special key
 name from ``pynput.keyboard.Key`` (``"space"``, ``"enter"``, ``"f1"`` …).
+
+This is a *global* hotkey (works even when the browser is not focused).
+macOS: grant the terminal / Python "Accessibility" + "Input Monitoring"
+permission.  Linux: needs an X11 session (Wayland blocks global hooks).
+Most USB buzzer buttons and presenter clickers send a key press, and the
+browser UI already listens for ``ui.trigger_keys`` — so in a normal kiosk
+setup this global listener is optional.
 """
 
 import asyncio
@@ -33,7 +40,12 @@ class KeyboardTrigger(InputTrigger):
             return
 
         self._callback = callback
-        self._loop = asyncio.get_running_loop()
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # Not called from the event loop: invoke the callback directly
+            # (the caller is then responsible for thread safety).
+            self._loop = None
 
         raw_key: str = self._config.get("trigger_key", "space")
 
@@ -46,11 +58,25 @@ class KeyboardTrigger(InputTrigger):
         def on_press(key) -> None:
             if key == trigger_key:
                 logger.debug("Keyboard trigger fired: %s", key)
-                if self._loop and self._callback:
-                    self._loop.call_soon_threadsafe(self._callback)
+                if not self._callback:
+                    return
+                if self._loop is not None:
+                    try:
+                        self._loop.call_soon_threadsafe(self._callback)
+                    except RuntimeError:
+                        pass  # loop closed during shutdown
+                else:
+                    self._callback()
 
-        self._listener = kb.Listener(on_press=on_press)
-        self._listener.start()
+        try:
+            self._listener = kb.Listener(on_press=on_press)
+            self._listener.start()
+        except Exception as exc:
+            # No X server / Wayland / missing macOS Accessibility permission
+            logger.error("Global keyboard trigger unavailable (%s). The browser UI still "
+                         "accepts keys while it has focus.", exc)
+            self._listener = None
+            return
         logger.info("Keyboard trigger listening for key: %r", raw_key)
 
     def stop(self) -> None:

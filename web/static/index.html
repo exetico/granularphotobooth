@@ -2,48 +2,78 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <title>GranularPhotoBooth</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <!-- Live preview / state overlay -->
-  <div id="app">
+  <div id="app" data-state="BOOT">
 
-    <!-- Live camera preview (MJPEG stream) -->
-    <div id="preview-container">
-      <img id="live-preview" src="/preview" alt="Live preview" />
-      <div id="countdown-overlay" class="hidden">
-        <span id="countdown-number"></span>
+    <!-- Live camera view (MJPEG). Always underneath everything else. -->
+    <div id="live" class="layer">
+      <img id="live-preview" alt="" draggable="false" />
+      <div id="live-placeholder" class="hidden"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Start screen -->
+    <div id="idle-overlay" class="layer overlay hidden">
+      <button id="btn-trigger" class="big-start" type="button" aria-label="Start">
+        <span class="cam-icon">📷</span>
+        <span id="idle-text">Tap anywhere to start</span>
+      </button>
+    </div>
+
+    <!-- Countdown -->
+    <div id="countdown-overlay" class="layer overlay hidden">
+      <div id="shot-counter"></div>
+      <div id="countdown-number"></div>
+    </div>
+
+    <!-- Camera flash -->
+    <div id="flash" class="layer"></div>
+
+    <!-- The shot that was just taken -->
+    <div id="shot-view" class="layer hidden">
+      <img id="shot-img" alt="" draggable="false" />
+    </div>
+
+    <!-- Processing -->
+    <div id="processing" class="layer overlay hidden">
+      <div class="spinner big"></div>
+      <div id="processing-text">Making your photos…</div>
+    </div>
+
+    <!-- Review of the finished result -->
+    <div id="review" class="layer hidden">
+      <div id="review-title"></div>
+      <div id="review-body">
+        <img id="review-img" alt="" draggable="false" />
+      </div>
+      <div id="review-controls">
+        <button id="btn-retake" class="btn btn-secondary" type="button">↩ Retake</button>
+        <button id="btn-confirm" class="btn btn-primary" type="button">✔ Done</button>
+      </div>
+      <div id="review-progress"><div id="review-progress-bar"></div></div>
+    </div>
+
+    <!-- Blocking problems (camera offline, disk full, connection lost) -->
+    <div id="banner" class="layer hidden">
+      <div class="banner-box">
+        <div class="spinner"></div>
+        <div id="banner-text"></div>
+        <div id="banner-detail"></div>
       </div>
     </div>
 
-    <!-- Captured frames shown during PREVIEW state (one card per shot) -->
-    <div id="captured-container" class="hidden">
-      <div id="frames-strip"></div>
+    <!-- Optional operator status line -->
+    <div id="status-bar" class="hidden">
+      <span id="state-label">…</span>
+      <span id="camera-label"></span>
     </div>
 
-    <!-- Status bar -->
-    <div id="status-bar">
-      <span id="state-label">IDLE</span>
-      <span id="shot-counter" class="hidden"></span>
-    </div>
-
-    <!-- Action buttons -->
-    <div id="controls">
-      <button id="btn-trigger" class="btn btn-primary" onclick="sendEvent('trigger')">
-        📷 Take Photo
-      </button>
-      <button id="btn-confirm" class="btn btn-success hidden" onclick="sendEvent('confirm')">
-        ✔ Keep
-      </button>
-      <button id="btn-retake" class="btn btn-warning hidden" onclick="sendEvent('retake')">
-        ↩ Retake
-      </button>
-    </div>
-
-    <!-- Toast notifications -->
-    <div id="toast-container"></div>
+    <div id="toast-container" aria-live="polite"></div>
   </div>
 
   <!-- RUNTIME_CONFIG -->
